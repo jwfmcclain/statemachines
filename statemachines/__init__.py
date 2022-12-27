@@ -100,29 +100,34 @@ class FlagOr:
         return f"{self.__class__.__name__}:{[str(x) for x in self.watch_list]}"
 
 class ButtonWatcher:
-    """Flag event that triggers when the specified pin transitions from
-       low to high. Implemented as a state machine, needs to be
-       registered with the runtime and provided with a suitable
-       frequency Pulser (e.g. 100Hz).
+    """Flag event that triggers when the specified button is
+       releaed. Defaults trigger on low ot high. Implemented as a
+       state machine, needs to be registered with the runtime and
+       provided with a suitable frequency Pulser (e.g. 100Hz).
+
     """
 
-    def __init__(self, pin, pulser, button=None):
+    def __init__(self, pin, pulser, invert=False, button=None):
         self.pin = pin # Save for __str__
+        self.invert = invert
         self.pulser = pulser
         if button is None:
             self.button = digitalio.DigitalInOut(pin)
-            self.button.switch_to_input(pull=digitalio.Pull.DOWN)
+            if invert:
+                self.button.switch_to_input(pull=digitalio.Pull.UP)
+            else:
+                self.button.switch_to_input(pull=digitalio.Pull.DOWN)
         else:
             self.button = button
         self.pending_count = 0
 
     def start(self, now):
-        if self.button.value:
+        if self.button.value ^ self.invert:
             return self.down, IMMEDATE_TRANSFER
         return self.up, IMMEDATE_TRANSFER
 
     def down(self, now):
-        if self.button.value:
+        if self.button.value ^ self.invert:
             return self.down, self.pulser
 
         # trigger on release
@@ -130,7 +135,7 @@ class ButtonWatcher:
         return self.up, self.pulser
 
     def up(self, now):
-        if self.button.value:
+        if self.button.value ^ self.invert:
             return self.down, self.pulser
         return self.up, self.pulser
 
